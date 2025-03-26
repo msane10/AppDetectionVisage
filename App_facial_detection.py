@@ -54,12 +54,16 @@ def create_zip_of_images():
     if not st.session_state.saved_images:
         return None
 
-    zip_buffer = BytesIO()
-    with zipfile.ZipFile(zip_buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zip_file:
-        for image_file in st.session_state.saved_images:
-            zip_file.write(image_file, os.path.basename(image_file))
-    zip_buffer.seek(0)
-    return zip_buffer
+    try:
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zip_file:
+            for image_file in st.session_state.saved_images:
+                zip_file.write(image_file, os.path.basename(image_file))
+        zip_buffer.seek(0)
+        return zip_buffer
+    except Exception as e:
+        st.error(f"Erreur lors de la création du fichier ZIP: {e}")
+        return None
 
 
 # Fonction principale de l'application Streamlit
@@ -98,17 +102,20 @@ def app():
     zip_buffer = create_zip_of_images()
     if zip_buffer:
         # Créer un fichier ZIP temporaire et le télécharger
-        with tempfile.NamedTemporaryFile(delete=False) as temp_zip:
-            temp_zip.write(zip_buffer.read())
-            temp_zip_path = temp_zip.name
+        try:
+            with tempfile.NamedTemporaryFile(delete=False) as temp_zip:
+                temp_zip.write(zip_buffer.read())
+                temp_zip_path = temp_zip.name
 
-        with open(temp_zip_path, 'rb') as f:
-            st.download_button(
-                label="📥 Télécharger toutes les images enregistrées",
-                data=f,
-                file_name="images.zip",
-                mime="application/zip"
-            )
+            with open(temp_zip_path, 'rb') as f:
+                st.download_button(
+                    label="📥 Télécharger toutes les images enregistrées",
+                    data=f,
+                    file_name="images.zip",
+                    mime="application/zip"
+                )
+        except Exception as e:
+            st.error(f"Erreur lors du téléchargement des images: {e}")
     else:
         st.warning("⚠️ Aucune image enregistrée à télécharger.")
 
