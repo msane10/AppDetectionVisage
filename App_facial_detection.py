@@ -18,7 +18,9 @@ if 'min_neighbors' not in st.session_state:
 if 'detecting' not in st.session_state:
     st.session_state.detecting = False
 if 'saved_images' not in st.session_state:
-    st.session_state.saved_images = []  # Liste pour stocker les images enregistrées
+    st.session_state.saved_images = []
+if 'stframe' not in st.session_state:
+    st.session_state.stframe = st.empty()
 
 
 # Définition de la fonction principale pour la détection des visages
@@ -27,13 +29,10 @@ def detect_faces(frame):
     faces = face_cascade.detectMultiScale(gray,
                                           scaleFactor=st.session_state.scale_factor,
                                           minNeighbors=st.session_state.min_neighbors)
-
     color = tuple(int(st.session_state.color.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
     color = color[::-1]
-
     for (x, y, w, h) in faces:
         cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-
     return frame, faces
 
 
@@ -56,7 +55,7 @@ def create_zip_of_images():
     return zip_buffer
 
 
-# Fonction de l'application Streamlit
+# Fonction principale de l'application Streamlit
 def app():
     st.title("Détection de visages avec Viola-Jones")
     st.markdown("""
@@ -75,30 +74,32 @@ def app():
     with col1:
         if st.button("Démarrer la détection"):
             st.session_state.detecting = True
+            st.rerun()
     with col2:
         if st.button("Enregistrer l'image") and 'frame' in st.session_state:
             save_image(st.session_state.frame)
     with col3:
         if st.button("Arrêter la détection"):
             st.session_state.detecting = False
+            st.rerun()
 
-    stframe = st.empty()
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    if st.session_state.detecting:
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-    while st.session_state.detecting:
-        ret, frame = cap.read()
-        if not ret:
-            st.error("Erreur : Impossible de capturer l'image")
-            break
+        while st.session_state.detecting:
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Erreur : Impossible de capturer l'image")
+                break
 
-        frame, _ = detect_faces(frame)
-        st.session_state.frame = frame
-        stframe.image(frame, channels="BGR")
+            frame, _ = detect_faces(frame)
+            st.session_state.frame = frame
+            st.session_state.stframe.image(frame, channels="BGR")
 
-    cap.release()
-    cv2.destroyAllWindows()
+        cap.release()
+        cv2.destroyAllWindows()
 
     # Vérification avant d'afficher le bouton de téléchargement
     if st.session_state.saved_images:
