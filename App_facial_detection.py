@@ -6,6 +6,7 @@ import time
 import os
 import zipfile
 from io import BytesIO
+import tempfile
 
 # Charger le classificateur de cascade de visages
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -50,6 +51,9 @@ def save_image(frame):
 
 # Fonction pour compresser les images enregistrées en un fichier ZIP
 def create_zip_of_images():
+    if not st.session_state.saved_images:
+        return None
+
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zip_file:
         for image_file in st.session_state.saved_images:
@@ -91,12 +95,14 @@ def app():
         webrtc_streamer(key="webcam", video_transformer_factory=FaceDetection)
 
     # Vérification avant d'afficher le bouton de téléchargement
-    if st.session_state.saved_images:
-        with open('images.zip', 'wb') as f:
-            zip_buffer = create_zip_of_images()
-            f.write(zip_buffer.read())
+    zip_buffer = create_zip_of_images()
+    if zip_buffer:
+        # Créer un fichier ZIP temporaire et le télécharger
+        with tempfile.NamedTemporaryFile(delete=False) as temp_zip:
+            temp_zip.write(zip_buffer.read())
+            temp_zip_path = temp_zip.name
 
-        with open('images.zip', 'rb') as f:
+        with open(temp_zip_path, 'rb') as f:
             st.download_button(
                 label="📥 Télécharger toutes les images enregistrées",
                 data=f,
