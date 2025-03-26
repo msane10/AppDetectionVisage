@@ -19,9 +19,6 @@ if 'detecting' not in st.session_state:
     st.session_state.detecting = False
 if 'saved_images' not in st.session_state:
     st.session_state.saved_images = []
-if 'stframe' not in st.session_state:
-    st.session_state.stframe = st.empty()
-
 
 # Définition de la fonction principale pour la détection des visages
 def detect_faces(frame):
@@ -35,7 +32,6 @@ def detect_faces(frame):
         cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
     return frame, faces
 
-
 # Fonction pour enregistrer l'image
 def save_image(frame):
     filename = f"detected_faces_{int(time.time())}.jpg"
@@ -43,7 +39,6 @@ def save_image(frame):
     if os.path.exists(filename):
         st.session_state.saved_images.append(filename)
         st.success(f"✅ Image enregistrée sous {filename}")
-
 
 # Fonction pour compresser les images enregistrées en un fichier ZIP
 def create_zip_of_images():
@@ -53,7 +48,6 @@ def create_zip_of_images():
             zip_file.write(image_file, os.path.basename(image_file))
     zip_buffer.seek(0)
     return zip_buffer
-
 
 # Fonction principale de l'application Streamlit
 def app():
@@ -83,6 +77,9 @@ def app():
             st.session_state.detecting = False
             st.rerun()
 
+    # Conteneur pour la vidéo en bas
+    video_container = st.empty()
+
     if st.session_state.detecting:
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -96,7 +93,7 @@ def app():
 
             frame, _ = detect_faces(frame)
             st.session_state.frame = frame
-            st.session_state.stframe.image(frame, channels="BGR")
+            video_container.image(frame, channels="BGR")  # Affichage en bas
 
         cap.release()
         cv2.destroyAllWindows()
@@ -116,7 +113,6 @@ def app():
             )
     else:
         st.warning("⚠️ Aucune image enregistrée à télécharger.")
-
 
 if __name__ == "__main__":
     app()
