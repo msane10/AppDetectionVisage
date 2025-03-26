@@ -1,6 +1,9 @@
 import cv2
 import streamlit as st
+<<<<<<< HEAD
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+=======
+>>>>>>> 1f81e7b (Mise à jour des fichiers requirement et gitignore a jour)
 import time
 import os
 import zipfile
@@ -8,7 +11,7 @@ from io import BytesIO
 import tempfile
 
 # Charger le classificateur de cascade de visages
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 # Initialiser les valeurs par défaut dans session_state
 if 'color' not in st.session_state:
@@ -22,22 +25,17 @@ if 'detecting' not in st.session_state:
 if 'saved_images' not in st.session_state:
     st.session_state.saved_images = []
 
-
 # Définition de la fonction principale pour la détection des visages
-class FaceDetection(VideoTransformerBase):
-    def transform(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=st.session_state.scale_factor, minNeighbors=st.session_state.min_neighbors)
-
-        color = tuple(int(st.session_state.color.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
-        color = color[::-1]
-
-        for (x, y, w, h) in faces:
-            cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
-
-        return img
-
+def detect_faces(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray,
+                                          scaleFactor=st.session_state.scale_factor,
+                                          minNeighbors=st.session_state.min_neighbors)
+    color = tuple(int(st.session_state.color.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+    color = color[::-1]
+    for (x, y, w, h) in faces:
+        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+    return frame, faces
 
 # Fonction pour enregistrer l'image
 def save_image(frame):
@@ -46,7 +44,6 @@ def save_image(frame):
     if os.path.exists(filename):
         st.session_state.saved_images.append(filename)
         st.success(f"✅ Image enregistrée sous {filename}")
-
 
 # Fonction pour compresser les images enregistrées en un fichier ZIP
 def create_zip_of_images():
@@ -64,10 +61,9 @@ def create_zip_of_images():
         st.error(f"Erreur lors de la création du fichier ZIP: {e}")
         return None
 
-
 # Fonction principale de l'application Streamlit
 def app():
-    st.title("Détection de visages avec la webcam du navigateur 📷")
+    st.title("Détection de visages avec Viola-Jones")
     st.markdown("""
     ### Instructions :
     1. Ajustez les paramètres avant de démarrer la détection.
@@ -93,12 +89,33 @@ def app():
             st.session_state.detecting = False
             st.rerun()
 
-    # Démarrer la webcam du navigateur pour la détection
+    # Conteneur pour la vidéo en bas
+    video_container = st.empty()
+
     if st.session_state.detecting:
+<<<<<<< HEAD
         try:
             webrtc_streamer(key="webcam", video_transformer_factory=FaceDetection)
         except Exception as e:
             st.error(f"Erreur lors de l'activation de la webcam : {e}")
+=======
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+        while st.session_state.detecting:
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Erreur : Impossible de capturer l'image")
+                break
+
+            frame, _ = detect_faces(frame)
+            st.session_state.frame = frame
+            video_container.image(frame, channels="BGR")  # Affichage en bas
+
+        cap.release()
+        cv2.destroyAllWindows()
+>>>>>>> 1f81e7b (Mise à jour des fichiers requirement et gitignore a jour)
 
     # Vérification avant d'afficher le bouton de téléchargement
     zip_buffer = create_zip_of_images()
@@ -120,7 +137,6 @@ def app():
             st.error(f"Erreur lors du téléchargement des images: {e}")
     else:
         st.warning("⚠️ Aucune image enregistrée à télécharger.")
-
 
 if __name__ == "__main__":
     app()
