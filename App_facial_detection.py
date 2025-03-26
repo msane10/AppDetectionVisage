@@ -1,6 +1,5 @@
 import cv2
 import streamlit as st
-import numpy as np
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 import time
 import os
@@ -96,7 +95,10 @@ def app():
 
     # Démarrer la webcam du navigateur pour la détection
     if st.session_state.detecting:
-        webrtc_streamer(key="webcam", video_transformer_factory=FaceDetection)
+        try:
+            webrtc_streamer(key="webcam", video_transformer_factory=FaceDetection)
+        except Exception as e:
+            st.error(f"Erreur lors de l'activation de la webcam : {e}")
 
     # Vérification avant d'afficher le bouton de téléchargement
     zip_buffer = create_zip_of_images()
