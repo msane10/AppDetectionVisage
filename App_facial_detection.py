@@ -2,10 +2,11 @@ import cv2
 import streamlit as st
 import time
 import os
-from PIL import Image
+import zipfile
+from io import BytesIO
 
 # Charger le classificateur de cascade de visages
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 # Initialiser les valeurs par défaut dans session_state
 if 'color' not in st.session_state:
@@ -14,72 +15,56 @@ if 'scale_factor' not in st.session_state:
     st.session_state.scale_factor = 1.3
 if 'min_neighbors' not in st.session_state:
     st.session_state.min_neighbors = 5
-if 'save_image' not in st.session_state:
-    st.session_state.save_image = False
 if 'detecting' not in st.session_state:
     st.session_state.detecting = False
-if 'last_saved_image' not in st.session_state:
-    st.session_state.last_saved_image = None
-if 'frame' not in st.session_state:  # Nouveau: pour stocker le dernier frame
-    st.session_state.frame = None
+if 'saved_images' not in st.session_state:
+    st.session_state.saved_images = []  # Liste pour stocker les images enregistrées
 
 
-# Définition de la fonction principale
-def detect_faces():
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+# Définition de la fonction principale pour la détection des visages
+def detect_faces(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray,
+                                          scaleFactor=st.session_state.scale_factor,
+                                          minNeighbors=st.session_state.min_neighbors)
 
-    if not cap.isOpened():
-        st.error("Erreur : Impossible d'ouvrir la webcam")
-        return
+    color = tuple(int(st.session_state.color.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
+    color = color[::-1]
 
-    st.session_state.detecting = True
-    stframe = st.empty()
+    for (x, y, w, h) in faces:
+        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
 
-    while st.session_state.detecting:
-        ret, frame = cap.read()
-        if not ret:
-            st.error("Erreur : Impossible de capturer l'image")
-            break
-
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=st.session_state.scale_factor,
-                                            minNeighbors=st.session_state.min_neighbors)
-
-        # Mettre à jour la couleur choisie
-        color = tuple(int(st.session_state.color.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))  # HEX -> BGR
-        color = color[::-1]  # Convertir en BGR (OpenCV utilise BGR au lieu de RGB)
-
-        for (x, y, w, h) in faces:
-            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-
-        st.session_state.frame = frame  # Stocker le frame actuel
-        stframe.image(frame, channels="BGR")
-
-        # Enregistrer l'image si demandé
-        if st.session_state.save_image:
-            filename = f"detected_faces_{int(time.time())}.jpg"
-            cv2.imwrite(filename, frame)
-            st.session_state.last_saved_image = filename
-            st.session_state.save_image = False
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-    st.session_state.detecting = False
+    return frame, faces
 
 
-# Interface Streamlit
+# Fonction pour enregistrer l'image
+def save_image(frame):
+    filename = f"detected_faces_{int(time.time())}.jpg"
+    cv2.imwrite(filename, frame)
+    if os.path.exists(filename):
+        st.session_state.saved_images.append(filename)
+        st.success(f"✅ Image enregistrée sous {filename}")
+
+
+# Fonction pour compresser les images enregistrées en un fichier ZIP
+def create_zip_of_images():
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for image_file in st.session_state.saved_images:
+            zip_file.write(image_file, os.path.basename(image_file))
+    zip_buffer.seek(0)
+    return zip_buffer
+
+
+# Fonction de l'application Streamlit
 def app():
     st.title("Détection de visages avec Viola-Jones")
     st.markdown("""
     ### Instructions :
     1. Ajustez les paramètres avant de démarrer la détection.
     2. Cliquez sur **Démarrer la détection** pour activer la webcam.
-    3. Cliquez sur **Enregistrer l'image** pour sauvegarder les visages détectés.
-    4. Utilisez **Télécharger l'image** pour récupérer l'image enregistrée.
-    5. Cliquez sur **Arrêter la détection** pour fermer la webcam.
+    3. Cliquez sur **Enregistrer l'image** pour sauvegarder l'image actuelle immédiatement.
+    4. Cliquez sur **Arrêter la détection** pour fermer la webcam.
     """)
 
     st.session_state.color = st.color_picker("Choisissez la couleur des rectangles", st.session_state.color)
@@ -89,34 +74,47 @@ def app():
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("Démarrer la détection"):
-            if not st.session_state.detecting:
-                detect_faces()
+            st.session_state.detecting = True
     with col2:
-        if st.button("Enregistrer l'image"):
-            if st.session_state.detecting:
-                st.session_state.save_image = True
-            else:
-                st.warning("Veuillez d'abord démarrer la détection")
+        if st.button("Enregistrer l'image") and 'frame' in st.session_state:
+            save_image(st.session_state.frame)
     with col3:
         if st.button("Arrêter la détection"):
             st.session_state.detecting = False
-    
-    # Section téléchargement
-    if st.session_state.last_saved_image and os.path.exists(st.session_state.last_saved_image):
-        st.markdown("---")
-        st.subheader("Télécharger l'image enregistrée")
-        with open(st.session_state.last_saved_image, "rb") as file:
+
+    stframe = st.empty()
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+    while st.session_state.detecting:
+        ret, frame = cap.read()
+        if not ret:
+            st.error("Erreur : Impossible de capturer l'image")
+            break
+
+        frame, _ = detect_faces(frame)
+        st.session_state.frame = frame
+        stframe.image(frame, channels="BGR")
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+    # Vérification avant d'afficher le bouton de téléchargement
+    if st.session_state.saved_images:
+        with open('images.zip', 'wb') as f:
+            zip_buffer = create_zip_of_images()
+            f.write(zip_buffer.read())
+
+        with open('images.zip', 'rb') as f:
             st.download_button(
-                label="Télécharger l'image",
-                data=file,
-                file_name=st.session_state.last_saved_image,
-                mime="image/jpeg"
+                label="📥 Télécharger toutes les images enregistrées",
+                data=f,
+                file_name="images.zip",
+                mime="application/zip"
             )
-        
-        if st.button("Supprimer l'image"):
-            os.remove(st.session_state.last_saved_image)
-            st.session_state.last_saved_image = None
-            st.experimental_rerun()
+    else:
+        st.warning("⚠️ Aucune image enregistrée à télécharger.")
 
 
 if __name__ == "__main__":
