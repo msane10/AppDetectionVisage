@@ -1,14 +1,9 @@
 import cv2
 import streamlit as st
-<<<<<<< HEAD
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
-=======
->>>>>>> 1f81e7b (Mise à jour des fichiers requirement et gitignore a jour)
 import time
 import os
 import zipfile
 from io import BytesIO
-import tempfile
 
 # Charger le classificateur de cascade de visages
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -47,19 +42,12 @@ def save_image(frame):
 
 # Fonction pour compresser les images enregistrées en un fichier ZIP
 def create_zip_of_images():
-    if not st.session_state.saved_images:
-        return None
-
-    try:
-        zip_buffer = BytesIO()
-        with zipfile.ZipFile(zip_buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zip_file:
-            for image_file in st.session_state.saved_images:
-                zip_file.write(image_file, os.path.basename(image_file))
-        zip_buffer.seek(0)
-        return zip_buffer
-    except Exception as e:
-        st.error(f"Erreur lors de la création du fichier ZIP: {e}")
-        return None
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode='w', compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for image_file in st.session_state.saved_images:
+            zip_file.write(image_file, os.path.basename(image_file))
+    zip_buffer.seek(0)
+    return zip_buffer
 
 # Fonction principale de l'application Streamlit
 def app():
@@ -93,12 +81,6 @@ def app():
     video_container = st.empty()
 
     if st.session_state.detecting:
-<<<<<<< HEAD
-        try:
-            webrtc_streamer(key="webcam", video_transformer_factory=FaceDetection)
-        except Exception as e:
-            st.error(f"Erreur lors de l'activation de la webcam : {e}")
-=======
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
@@ -115,26 +97,20 @@ def app():
 
         cap.release()
         cv2.destroyAllWindows()
->>>>>>> 1f81e7b (Mise à jour des fichiers requirement et gitignore a jour)
 
     # Vérification avant d'afficher le bouton de téléchargement
-    zip_buffer = create_zip_of_images()
-    if zip_buffer:
-        # Créer un fichier ZIP temporaire et le télécharger
-        try:
-            with tempfile.NamedTemporaryFile(delete=False) as temp_zip:
-                temp_zip.write(zip_buffer.read())
-                temp_zip_path = temp_zip.name
+    if st.session_state.saved_images:
+        with open('images.zip', 'wb') as f:
+            zip_buffer = create_zip_of_images()
+            f.write(zip_buffer.read())
 
-            with open(temp_zip_path, 'rb') as f:
-                st.download_button(
-                    label="📥 Télécharger toutes les images enregistrées",
-                    data=f,
-                    file_name="images.zip",
-                    mime="application/zip"
-                )
-        except Exception as e:
-            st.error(f"Erreur lors du téléchargement des images: {e}")
+        with open('images.zip', 'rb') as f:
+            st.download_button(
+                label="📥 Télécharger toutes les images enregistrées",
+                data=f,
+                file_name="images.zip",
+                mime="application/zip"
+            )
     else:
         st.warning("⚠️ Aucune image enregistrée à télécharger.")
 
